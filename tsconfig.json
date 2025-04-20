@@ -1,0 +1,60 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    /* Base Options: */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    /* If transpiling with TypeScript: */
+    /*"module": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true,*/
+
+    /* AND if you're building for a library: */
+    /*"declaration": true,*/
+
+    /* AND if you're building for a library in a monorepo: */
+    /*"declarationMap": true,*/
+
+    /* No DOM required */
+    /* "lib": ["es2022"], */
+
+    /* If your code runs in the DOM: */
+    "lib": ["es2022", "dom", "dom.iterable"],
+
+    /* Using tsup. If NOT transpiling with TypeScript: */
+    "noEmit": true,
+    "module": "Preserve",
+
+    /* Ensure matchers like .toBeInTheDocument() are available */
+    "types": ["node", "jest", "@testing-library/jest-dom"],
+
+    /* Allowing for React */
+    "jsx": "react",
+    "moduleResolution": "node",
+
+    /* If added to, ensure to also update moduleNameMapper in jest.config.ts */
+    "paths": {
+      "src/*": ["./src/*"],
+      "tests/*": ["./tests/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+  ],
+}
