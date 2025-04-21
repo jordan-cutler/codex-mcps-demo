@@ -1,20 +1,20 @@
 {
-  "name": "ai-testing-library",
+  "name": "codex-mcps-demo",
   "version": "1.0.0",
   "main": "dist/index.js",
-  "description": "A demo package for Total TypeScript",
+  "description": "A demo package for Codex MCPS",
   "keywords": [
     "demo",
     "typescript"
   ],
-  "homepage": "https://github.com/jordan-cutler/ai-testing-library",
+  "homepage": "codex-mcps-demo",
   "bugs": {
-    "url": "https://github.com/jordan-cutler/ai-testing-library/issues"
+    "url": "https://github.com/jordan-cutler/codex-mcps-demo/issues"
   },
   "author": "Jordan Cutler <jordan.cutler.pa@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jordan-cutler/ai-testing-library.git"
+    "url": "git+https://github.com/jordan-cutler/codex-mcps-demo.git"
   },
   "files": [
     "dist"
@@ -33,6 +33,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "babel-jest": "^29.7.0",
