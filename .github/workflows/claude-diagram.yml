@@ -41,7 +41,7 @@ jobs:
         run: |
           export ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}"
           mkdir -p folder-samples/git/diagram.ai.md
-          claude -p "Update folder-samples/git/diagram.ai.md to describe the folder: folder-samples/git" --dangerously-skip-permissions
+          claude -p "Update folder-samples/git/diagram.ai.md to describe the folder: folder-samples/git"
 
       - name: Configure git
         run: |
