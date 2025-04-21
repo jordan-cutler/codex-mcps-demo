@@ -8,7 +8,12 @@ component GitMCPServer {
   icon: git
 
   component ServerCore {
-    description: "Core server implementation"
+    description: "Core server implementation in server.py"
+    items: [
+      "Handles MCP protocol communication",
+      "Routes requests to appropriate Git tools",
+      "Processes and formats responses"
+    ]
   }
 
   component GitOperations {
@@ -58,21 +63,48 @@ component GitMCPServer {
   }
 }
 
+component GitRepository {
+  description: "Local Git repository structure"
+  icon: database
+  
+  component WorkingDirectory {
+    description: "Files being worked on"
+  }
+  
+  component StagingArea {
+    description: "Files staged for commit"
+  }
+  
+  component LocalRepo {
+    description: "Committed files history"
+  }
+}
+
 component Client {
   description: "Client applications using the Git MCP server"
   
   component ClaudeDesktop {
     description: "Claude Desktop integration"
+    items: [
+      "Configure in claude_desktop_config.json"
+    ]
   }
   
   component ZedEditor {
     description: "Zed editor integration"
+    items: [
+      "Configure in settings.json"
+    ]
+  }
+  
+  component CustomApps {
+    description: "Custom applications using MCP"
   }
   
   component DevTools {
     description: "Development & debugging tools"
     items: [
-      "MCP Inspector"
+      "MCP Inspector for testing and debugging"
     ]
   }
 }
@@ -81,25 +113,40 @@ connection GitMCPServer -> Client {
   description: "Provides Git operations via Model Context Protocol"
 }
 
+connection GitMCPServer -> GitRepository {
+  description: "Executes Git commands on repository"
+}
+
 deployment Deployment {
   description: "Deployment options for Git MCP server"
   
   component UVDeployment {
     description: "Deployment using uv/uvx"
     highlight: true
+    items: [
+      "Recommended approach",
+      "No specific installation needed"
+    ]
   }
   
   component PipDeployment {
     description: "Deployment using pip"
+    items: [
+      "pip install mcp-server-git"
+    ]
   }
   
   component DockerDeployment {
     description: "Deployment using Docker"
+    items: [
+      "Containerized deployment",
+      "Supports path binding for repository access"
+    ]
   }
 }
 
 note {
-  content: "The Git MCP server provides tools to read, search, and manipulate Git repositories via Large Language Models, enabling Git automation through natural language."
+  content: "The Git MCP server provides tools to read, search, and manipulate Git repositories via Large Language Models, enabling Git automation through natural language. The server is in early development with functionality subject to change."
   position: bottom
 }
 ```
