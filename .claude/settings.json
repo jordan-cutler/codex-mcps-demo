@@ -4,7 +4,9 @@
       "Bash(*)",
       "FileEdit(*)",
       "FileRead(*)",
-      "FileWrite(*)"
+      "FileWrite(*)",
+      "Replace",
+      "Replace(*)"
     ]
   }
 }
