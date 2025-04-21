@@ -1,0 +1,14 @@
+name: Print index.ts
+
+on:
+  push:
+
+jobs:
+  print_file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Print index.ts
+        run: cat src/index.ts
