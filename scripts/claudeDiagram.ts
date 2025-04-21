@@ -5,6 +5,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
+import { PROMPTS } from 'scripts/prompts';
 
 // Define an interface for the potential error from execSync
 interface ExecSyncError extends Error {
@@ -53,9 +54,14 @@ async function run() {
   // For simplicity, we assume folder names don't contain double quotes here.
 
   const diagramFile = `${folderName}/diagram.ai.md`;
-  const request = `Add a file called ${diagramFile} which uses mermaid syntax to describe the folder: ${folderName}`;
+  // const request = `Add a file called ${diagramFile} which uses mermaid syntax to describe the folder: ${folderName}`;
   const options = '-p';
-  const command = `claude ${options} "${request}"`;
+  // const command = `claude ${options} "${request}"`;
+  const getClaudeCommand = (prompt: string) => {
+    return `claude ${options} "${prompt}"`;
+  };
+  const firstPrompt = `For folder ${folderName}, do the following: ${PROMPTS.SYSTEM_FIRST_PROMPT_EXPLANATION}`;
+  const command = `${getClaudeCommand(firstPrompt)} | ${getClaudeCommand(PROMPTS.SYSTEM_SECOND_PROMPT_KEY_COMPONENTS)} | ${getClaudeCommand(PROMPTS.SYSTEM_THIRD_PROMPT_MERMAID_SYNTAX)} | ${getClaudeCommand(`Output it to ${diagramFile}`)}`;
 
   console.log(chalk.blue('Running command:'), chalk.cyan(command));
   console.log(chalk.gray('---')); // Separator
