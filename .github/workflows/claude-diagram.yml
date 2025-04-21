@@ -50,7 +50,7 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          git add folder-samples/git/diagram.ai.md
+          git add --all
           if git diff --staged --quiet; then
             echo "No changes to commit"
             echo "changed=false" >> $GITHUB_OUTPUT
