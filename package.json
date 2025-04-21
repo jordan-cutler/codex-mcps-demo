@@ -74,6 +74,7 @@
   },
   "dependencies": {
     "@openai/codex": "^0.1.2504172351",
+    "ai": "^4.3.9",
     "chalk": "^5.4.1",
     "dotenv": "^16.5.0",
     "fs-extra": "^11.3.0",
