@@ -2,11 +2,11 @@ name: Generate Claude Diagram
 
 on:
   push:
-    paths: # Only run if relevant code changes, not just the diagram itself
-      - 'scripts/codexDiagram.ts'
-      - 'folder-samples/git/**'
-      - '!folder-samples/git/diagram.ai.md'
-      - '.github/workflows/codex-diagram.yml'
+    # paths: # Only run if relevant code changes, not just the diagram itself
+    #   - 'scripts/codexDiagram.ts'
+    #   - 'folder-samples/git/**'
+    #   - '!folder-samples/git/diagram.ai.md'
+    #   - '.github/workflows/codex-diagram.yml'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
