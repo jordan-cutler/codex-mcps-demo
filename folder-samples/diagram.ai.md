@@ -3,7 +3,7 @@
 ```mermaid
 graph TD
     root[folder-samples]
-    
+
     %% Server implementations
     aws[aws-kb-retrieval-server]
     brave[brave-search]
@@ -25,7 +25,7 @@ graph TD
     slack[slack]
     sqlite[sqlite]
     time[time]
-    
+
     %% Connect all to root
     root --> aws
     root --> brave
