@@ -2,8 +2,6 @@ name: Generate Codex Diagram
 
 on:
   push:
-    branches:
-      - main
     paths: # Only run if relevant code changes, not just the diagram itself
       - 'scripts/codexDiagram.ts'
       - 'folder-samples/git/**'
