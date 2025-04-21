@@ -40,7 +40,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
-          echo "OPENAI_API_KEY: $OPENAI_API_KEY"
           node --experimental-strip-types scripts/codexDiagram.ts folder-samples/git
 
       - name: Configure git
