@@ -58,7 +58,7 @@ async function run() {
   const options = '-p';
   // const command = `claude ${options} "${request}"`;
   const getClaudeCommand = (prompt: string) => {
-    return `claude ${options} "${prompt}"`;
+    return `claude ${options} "${prompt}" --json`;
   };
   const firstPrompt = `For folder ${folderName}, do the following: ${PROMPTS.SYSTEM_FIRST_PROMPT_EXPLANATION}`;
   const command = `${getClaudeCommand(firstPrompt)} | ${getClaudeCommand(PROMPTS.SYSTEM_SECOND_PROMPT_KEY_COMPONENTS)} | ${getClaudeCommand(PROMPTS.SYSTEM_THIRD_PROMPT_MERMAID_SYNTAX)} | ${getClaudeCommand(`Output it to ${diagramFile}`)}`;
