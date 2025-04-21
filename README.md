@@ -1,4 +1,4 @@
-**ai-testing-library**
+**codex-mcps-demo**
 
 Note: Change to
 ```
