@@ -40,7 +40,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
-          node --experimental-strip-types scripts/codexDiagram.ts folder-samples/git
+          codex --quiet --approval-mode full-auto --model gpt-4o-mini "Add a file called folder-samples/git/diagram.ai.md which uses mermaid syntax to describe the folder: folder-samples/git"
 
       - name: Configure git
         run: |
