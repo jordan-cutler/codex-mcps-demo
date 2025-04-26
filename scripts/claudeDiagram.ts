@@ -2,6 +2,7 @@
 
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs/promises';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import chalk from 'chalk';
@@ -59,7 +60,7 @@ async function run() {
       throw new Error(firstPromptError);
     }
     console.log(firstPromptOutput);
-    await exec(`echo "${firstPromptOutput}" > ${outputDir}/first.txt`);
+    await fs.writeFile(`${outputDir}/first.txt`, firstPromptOutput, 'utf-8');
     console.log('--------------------------------');
 
     const { stdout: secondPromptOutput, stderr: secondPromptError } =
@@ -72,7 +73,11 @@ async function run() {
     }
 
     console.log(secondPromptOutput);
-    await exec(`echo "${secondPromptOutput}" > ${outputDir}/second.txt`);
+    await fs.writeFile(
+      `${outputDir}/second.txt`,
+      secondPromptOutput,
+      'utf-8',
+    );
     console.log('--------------------------------');
 
     const { stdout: thirdPromptOutput, stderr: thirdPromptError } = await exec(
@@ -84,9 +89,16 @@ async function run() {
     }
 
     console.log(thirdPromptOutput);
-    await exec(`echo "${thirdPromptOutput}" > ${outputDir}/third.txt`);
-    await exec(
-      `echo "${thirdPromptOutput}" > ${inputFolderName}/${OUTPUT_FILE}`,
+
+    await fs.writeFile(
+      `${outputDir}/third.txt`,
+      thirdPromptOutput,
+      'utf-8',
+    );
+    await fs.writeFile(
+      `${inputFolderName}/${OUTPUT_FILE}`,
+      thirdPromptOutput,
+      'utf-8',
     );
 
     console.log(chalk.green('✅ Claude command finished successfully.'));
