@@ -62,5 +62,5 @@ jobs:
       - name: Commit and push changes
         if: steps.check_changes.outputs.changed == 'true'
         run: |
-          git commit -m "chore: generate mermaid diagram for folder-samples/git [skip ci]"
+          git commit -m "chore: generate mermaid diagram for folder-samples/slack [skip ci]"
           git push
