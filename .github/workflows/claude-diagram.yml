@@ -40,9 +40,7 @@ jobs:
       - name: Run claudeDiagram script
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          export ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}"
-          node --experimental-strip-types scripts/claudeDiagram.ts folder-samples/slack
+        run: node --experimental-strip-types scripts/claudeDiagram.ts folder-samples/slack
 
       - name: Configure git
         run: |
