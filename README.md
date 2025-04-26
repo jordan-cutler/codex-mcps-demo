@@ -1,7 +1,7 @@
 **codex-mcps-demo**
 
 # Try it out
-1. Clone the repo
+1. Clone the repo via `git clone https://github.com/jordan-cutler/codex-mcps-demo.git`
 2. Ensure you're on Node 22. Run `nvm install 22 && nvm alias default 22 && nvm use 22`
 3. Run `pnpm install` to install dependencies
 4. Run `npm install -g @anthropic-ai/claude-code` [per instructions](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)
