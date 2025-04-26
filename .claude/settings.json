@@ -5,8 +5,8 @@
       "FileEdit(*)",
       "FileRead(*)",
       "FileWrite(*)",
-      "Replace",
-      "Replace(*)"
+      "Write",
+      "Write(*)"
     ]
   }
 }
