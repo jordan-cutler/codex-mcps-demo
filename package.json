@@ -73,10 +73,18 @@
     }
   },
   "dependencies": {
+    "@langchain/core": "^0.3.55",
+    "@langchain/langgraph": "^0.2.71",
+    "@langchain/langgraph-checkpoint": "^0.0.17",
+    "@langchain/mcp-adapters": "^0.4.2",
+    "@langchain/openai": "^0.5.10",
     "@openai/codex": "^0.1.2504172351",
+    "@types/uuid": "^10.0.0",
     "chalk": "^5.4.1",
     "dotenv": "^16.5.0",
     "fs-extra": "^11.3.0",
-    "yargs": "^17.7.2"
+    "uuid": "^11.1.0",
+    "yargs": "^17.7.2",
+    "zod": "^3.24.4"
   }
 }
