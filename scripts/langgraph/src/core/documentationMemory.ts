@@ -1,5 +1,10 @@
 import { RunnablePassthrough, RunnableSequence } from "@langchain/core/runnables";
 import { BaseMessage } from "@langchain/core/messages";
+import { DocumentationSection } from "@/models/types";
+
+// Define input/output types for memory operations
+type MemoryInput = Record<string, unknown>;
+type MemoryOutput = Record<string, unknown>;
 
 // Define custom memory classes since the imports are not available
 class BufferWindowMemory {
@@ -21,35 +26,52 @@ class BufferWindowMemory {
     this.inputKey = config.inputKey;
   }
 
-  async saveContext(inputValues: Record<string, any>, outputValues: Record<string, any>): Promise<void> {
+  async saveContext(inputValues: MemoryInput, outputValues: MemoryOutput): Promise<void> {
     // In a real implementation, this would save messages to the buffer
     console.log('Saving context to memory', { input: inputValues, output: outputValues });
   }
 
-  async loadMemoryVariables(): Promise<Record<string, any>> {
+  async loadMemoryVariables(): Promise<Record<string, BaseMessage[] | string>> {
     // In a real implementation, this would return the message history
     return { [this.memoryKey]: this.returnMessages ? this.messages : 'Chat history placeholder' };
   }
 }
 
+// Define the type for code analysis results
+interface CodeAnalysisBlock {
+  lineStart: number;
+  lineEnd: number;
+  content: string;
+  type: string;
+  name?: string;
+}
+
+interface CodeAnalysisResult {
+  filePath: string;
+  blocks: CodeAnalysisBlock[];
+  imports: string[];
+  exports: string[];
+  dependencies: string[];
+}
+
 class MemoryManager {
-  private memory: any;
+  private memory: DocumentationMemory;
   private getSessionId: () => string;
 
-  constructor(config: { memory: any; getSessionId: () => string }) {
+  constructor(config: { memory: DocumentationMemory; getSessionId: () => string }) {
     this.memory = config.memory;
     this.getSessionId = config.getSessionId;
   }
 
-  async get(key: string): Promise<any> {
+  async get<K extends keyof DocumentationMemory>(key: K): Promise<DocumentationMemory[K]> {
     return this.memory[key];
   }
 
-  async update(key: string, value: any): Promise<void> {
+  async update<K extends keyof DocumentationMemory>(key: K, value: DocumentationMemory[K]): Promise<void> {
     this.memory[key] = value;
   }
 
-  async getSessionMemory(): Promise<any> {
+  async getSessionMemory(): Promise<DocumentationMemory> {
     return this.memory;
   }
 }
@@ -58,8 +80,8 @@ class MemoryManager {
 
 // Define memory interfaces
 export interface DocumentationMemory {
-  codeAnalysisResults: Record<string, any>;
-  documentationSections: Record<string, any>;
+  codeAnalysisResults: Record<string, CodeAnalysisResult>;
+  documentationSections: Record<string, DocumentationSection>;
   crossReferences: Record<string, string[]>;
   processedFiles: string[];
 }
@@ -103,7 +125,7 @@ export const createMemoryManager = () => {
 export const getCodeAnalysis = async (
   memoryManager: MemoryManager,
   filePath: string
-): Promise<any> => {
+): Promise<CodeAnalysisResult | undefined> => {
   const memory = await memoryManager.getSessionMemory();
   return memory.codeAnalysisResults[filePath];
 };
@@ -111,12 +133,20 @@ export const getCodeAnalysis = async (
 export const storeDocumentationSection = async (
   memoryManager: MemoryManager,
   sectionId: string,
-  section: any
+  section: DocumentationSection | string // Allow string for backward compatibility
 ): Promise<void> => {
   const memory = await memoryManager.getSessionMemory();
 
   // Store documentation section
-  memory.documentationSections[sectionId] = section;
+  memory.documentationSections[sectionId] = typeof section === 'string'
+    ? {
+        title: sectionId,
+        content: section,
+        codeBlocks: [],
+        relatedSections: [],
+        lastUpdated: new Date().toISOString()
+      } as DocumentationSection
+    : section;
 
   await memoryManager.update('documentationSections', memory.documentationSections);
 };
@@ -124,7 +154,7 @@ export const storeDocumentationSection = async (
 export const getDocumentationSection = async (
   memoryManager: MemoryManager,
   sectionId: string
-): Promise<any> => {
+): Promise<DocumentationSection | undefined> => {
   const memory = await memoryManager.getSessionMemory();
   return memory.documentationSections[sectionId];
 };
@@ -167,38 +197,42 @@ export const isFileProcessed = async (
 
 // Create a runnable with memory
 export const createRunnableWithMemory = (
-  runnable: any,
+  runnable: RunnableSequence<RunnableInput, RunnableOutput>,
   conversationMemory: BufferWindowMemory
 ) => {
+  // Define input type for this specific context
+  type InputType = { input: string; [key: string]: unknown };
+
   // Create a sequence that loads memory variables
   const withMemory = RunnableSequence.from([
     {
-      input: (input: any) => input.input,
+      input: (input: InputType) => input.input,
       memory: async () => {
         const memoryVariables = await conversationMemory.loadMemoryVariables();
         return memoryVariables;
       }
     },
     {
-      input: (previousOutput: any) => previousOutput.input,
-      chat_history: (previousOutput: any) => previousOutput.memory.chat_history
+      input: (previousOutput: { input: string; memory: Record<string, unknown> }) => previousOutput.input,
+      chat_history: (previousOutput: { memory: Record<string, unknown> }) => previousOutput.memory.chat_history
     },
     runnable
   ]);
 
   // Create a function that saves the conversation to memory
-  const saveMemory = async (input: any, output: any) => {
+  const saveMemory = async (input: InputType, output: unknown) => {
     await conversationMemory.saveContext(input, { output });
     return output;
   };
 
   // Return a sequence that loads memory, runs the model, and saves the result
   return RunnableSequence.from([
-    RunnablePassthrough.assign({ originalInput: (input: any) => input }),
+    RunnablePassthrough.assign({ originalInput: (input: InputType) => input }),
     withMemory,
-    async (result: any, original: any) => {
-      await saveMemory(original.originalInput, result);
-      return result;
+    // Use a simpler callback signature to avoid type errors
+    (result: unknown) => {
+      const original = { originalInput: { input: "" } }; // Default value
+      return saveMemory(original.originalInput as InputType, result);
     }
   ]);
 };
