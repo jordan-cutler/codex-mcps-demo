@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:doc": "tsx -r tsconfig-paths/register src/test/documentationTest.ts",
     "dev": "tsx src/index.ts",
     "document": "tsx src/index.ts"
   },
