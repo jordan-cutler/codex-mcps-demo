@@ -8,15 +8,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 import {
   createMemoryManager,
-  storeCodeAnalysis,
   getCodeAnalysis,
   storeDocumentationSection,
   addCrossReference,
   getCrossReferences,
-  isFileProcessed,
   createRunnableWithMemory,
 } from '@/core/documentationMemory';
-import { CodeAnalyzer } from '@/core/codeAnalyzer';
 import { createMCPTools } from '@/core/mcpConfig';
 
 /**
@@ -80,7 +77,6 @@ Here's how to use this code:
 export const createDocumentationAgent = async () => {
   // Initialize memory
   const { conversationMemory, memoryManager } = createMemoryManager();
-  const codeAnalyzer = CodeAnalyzer.getInstance();
 
   // Create MCP tools
   const mcpTools = await createMCPTools();
@@ -88,37 +84,6 @@ export const createDocumentationAgent = async () => {
   // Create documentation generation tool
   const documentationGenerationTool = createDocumentationGenerationTool();
 
-  // Create custom tools
-  const analyzeFileTool = tool(
-    async (input: { filePath: string }) => {
-      try {
-        // Check if file has already been processed
-        if (await isFileProcessed(memoryManager, input.filePath)) {
-          return `File ${input.filePath} has already been analyzed. Retrieving from memory.`;
-        }
-
-        // Analyze file
-        const analysisResult = await codeAnalyzer.analyzeFile(input.filePath);
-
-        // Store analysis in memory
-        await storeCodeAnalysis(memoryManager, input.filePath, analysisResult);
-
-        return `Successfully analyzed ${input.filePath} and stored results in memory.`;
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          return `Error analyzing file: ${error.message}`;
-        }
-        return `Error analyzing file: Unknown error`;
-      }
-    },
-    {
-      name: 'analyze_file',
-      description: 'Analyze a code file and store the results in memory',
-      schema: z.object({
-        filePath: z.string().describe('Path to the file to analyze'),
-      }),
-    },
-  );
 
   const generateDocumentationSectionTool = tool(
     async (input: { filePath: string; sectionId: string }) => {
@@ -233,7 +198,7 @@ export const createDocumentationAgent = async () => {
     async (input: { projectPath: string; outputPath: string }) => {
       try {
         const { projectPath, outputPath } = input;
-        
+
         // Return information about the project to help the agent plan
         return `Project path: ${projectPath}\nOutput path: ${outputPath}\n\nYou should now create a documentation plan by:\n1. Exploring the project structure\n2. Identifying key files and components\n3. Deciding on the documentation structure\n\nOnce you have a plan, you can execute it by analyzing files and generating documentation.`;
       } catch (error: unknown) {
@@ -258,7 +223,7 @@ export const createDocumentationAgent = async () => {
     async (input: { task: string; filePath?: string; outputPath?: string }) => {
       try {
         const { task, filePath, outputPath } = input;
-        
+
         // This is a placeholder that would normally execute a specific task
         // In a real implementation, this would perform different actions based on the task type
         return `Executed task: ${task}${filePath ? ` for file ${filePath}` : ''}${outputPath ? ` with output to ${outputPath}` : ''}`;
@@ -283,7 +248,6 @@ export const createDocumentationAgent = async () => {
   // Combine all tools
   const tools = [
     ...mcpTools.tools, // Use all MCP tools directly
-    analyzeFileTool,
     generateDocumentationSectionTool,
     addCrossReferenceTool,
     getCrossReferencesTool,

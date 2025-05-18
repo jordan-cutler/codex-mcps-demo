@@ -8,7 +8,7 @@ class BufferWindowMemory {
   private returnMessages: boolean;
   private memoryKey: string;
   private inputKey: string;
-  
+
   constructor(config: {
     k: number;
     returnMessages: boolean;
@@ -20,12 +20,12 @@ class BufferWindowMemory {
     this.memoryKey = config.memoryKey;
     this.inputKey = config.inputKey;
   }
-  
+
   async saveContext(inputValues: Record<string, any>, outputValues: Record<string, any>): Promise<void> {
     // In a real implementation, this would save messages to the buffer
     console.log('Saving context to memory', { input: inputValues, output: outputValues });
   }
-  
+
   async loadMemoryVariables(): Promise<Record<string, any>> {
     // In a real implementation, this would return the message history
     return { [this.memoryKey]: this.returnMessages ? this.messages : 'Chat history placeholder' };
@@ -35,20 +35,20 @@ class BufferWindowMemory {
 class MemoryManager {
   private memory: any;
   private getSessionId: () => string;
-  
+
   constructor(config: { memory: any; getSessionId: () => string }) {
     this.memory = config.memory;
     this.getSessionId = config.getSessionId;
   }
-  
+
   async get(key: string): Promise<any> {
     return this.memory[key];
   }
-  
+
   async update(key: string, value: any): Promise<void> {
     this.memory[key] = value;
   }
-  
+
   async getSessionMemory(): Promise<any> {
     return this.memory;
   }
@@ -83,41 +83,21 @@ export const createMemoryManager = () => {
     memoryKey: "chat_history",
     inputKey: "input"
   });
-  
+
   // Long-term memory for documentation context
   const documentationMemory = createInitialMemory();
-  
+
   // Create memory manager
   const memoryManager = new MemoryManager({
     memory: documentationMemory,
     getSessionId: () => "documentation_session"
   });
-  
+
   return {
     conversationMemory,
     documentationMemory,
     memoryManager
   };
-};
-
-// Memory utilities
-export const storeCodeAnalysis = async (
-  memoryManager: MemoryManager,
-  filePath: string,
-  analysis: any
-): Promise<void> => {
-  const memory = await memoryManager.getSessionMemory();
-  
-  // Update code analysis results
-  memory.codeAnalysisResults[filePath] = analysis;
-  
-  // Add to processed files
-  if (!memory.processedFiles.includes(filePath)) {
-    memory.processedFiles.push(filePath);
-  }
-  
-  await memoryManager.update('codeAnalysisResults', memory.codeAnalysisResults);
-  await memoryManager.update('processedFiles', memory.processedFiles);
 };
 
 export const getCodeAnalysis = async (
@@ -134,10 +114,10 @@ export const storeDocumentationSection = async (
   section: any
 ): Promise<void> => {
   const memory = await memoryManager.getSessionMemory();
-  
+
   // Store documentation section
   memory.documentationSections[sectionId] = section;
-  
+
   await memoryManager.update('documentationSections', memory.documentationSections);
 };
 
@@ -155,17 +135,17 @@ export const addCrossReference = async (
   targetId: string
 ): Promise<void> => {
   const memory = await memoryManager.getSessionMemory();
-  
+
   // Initialize cross-references array if it doesn't exist
   if (!memory.crossReferences[sourceId]) {
     memory.crossReferences[sourceId] = [];
   }
-  
+
   // Add cross-reference if it doesn't already exist
   if (!memory.crossReferences[sourceId].includes(targetId)) {
     memory.crossReferences[sourceId].push(targetId);
   }
-  
+
   await memoryManager.update('crossReferences', memory.crossReferences);
 };
 
@@ -205,13 +185,13 @@ export const createRunnableWithMemory = (
     },
     runnable
   ]);
-  
+
   // Create a function that saves the conversation to memory
   const saveMemory = async (input: any, output: any) => {
     await conversationMemory.saveContext(input, { output });
     return output;
   };
-  
+
   // Return a sequence that loads memory, runs the model, and saves the result
   return RunnableSequence.from([
     RunnablePassthrough.assign({ originalInput: (input: any) => input }),
