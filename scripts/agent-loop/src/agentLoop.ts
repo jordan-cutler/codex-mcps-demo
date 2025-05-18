@@ -131,6 +131,9 @@ export class AgentLoop {
               for (const toolCall of chunk.toolCalls) {
                 if (!allToolCalls.some((tc) => tc.id === toolCall.id)) {
                   allToolCalls.push(toolCall);
+                  this.logger.info('AgentLoop', `Received tool call: ${toolCall.name}`, {
+                    params: toolCall.params,
+                  });
                 }
               }
             }
@@ -144,6 +147,12 @@ export class AgentLoop {
             }
           },
         );
+
+        this.logger.debug('AgentLoop', 'LLM full response content', {
+          content: fullContent,
+          contentLength: fullContent.length,
+          toolCalls: JSON.stringify(allToolCalls),
+        });
 
         // Save assistant response to memory
         await this.memoryManager.addAssistantMessage(fullContent, allToolCalls);

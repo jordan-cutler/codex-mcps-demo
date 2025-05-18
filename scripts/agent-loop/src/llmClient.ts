@@ -114,13 +114,7 @@ export class LLMClient {
         function: {
           name: tool.name,
           description: tool.description,
-          parameters: {
-            type: 'object',
-            properties: tool.parameters,
-            required: Object.keys(tool.parameters).filter(
-              (key) => tool.parameters[key].required,
-            ),
-          },
+          parameters: tool.parameters,
         },
       }));
 
@@ -144,14 +138,25 @@ export class LLMClient {
         let chunkText = '';
         const delta = chunk.choices[0]?.delta;
 
+        this.logger.debug('LLMClient', 'Received chunk from OpenAI', {
+          delta: JSON.stringify(delta),
+          raw: JSON.stringify(chunk),
+        });
+
         // Extract text content
         if (delta?.content) {
           chunkText = delta.content;
           fullContent += chunkText;
+          this.logger.debug('LLMClient', 'Text content in chunk', {
+            text: chunkText,
+          });
         }
 
         // Extract tool calls
         if (delta?.tool_calls && delta.tool_calls.length > 0) {
+          this.logger.debug('LLMClient', 'Tool calls in chunk', {
+            toolCalls: JSON.stringify(delta.tool_calls),
+          });
           for (const toolCall of delta.tool_calls) {
             const id = toolCall.id || '';
 
@@ -159,25 +164,47 @@ export class LLMClient {
             if (!pendingToolCalls[id]) {
               pendingToolCalls[id] = {
                 id,
-                name: '',
-                arguments: '',
+                name: toolCall.function?.name || '',
+                arguments: toolCall.function?.arguments || '',
               };
-            }
 
-            if (toolCall.function?.name) {
-              pendingToolCalls[id].name = toolCall.function.name;
-            }
-
-            if (toolCall.function?.arguments) {
-              pendingToolCalls[id].arguments += toolCall.function.arguments;
+              this.logger.debug('LLMClient', 'Created new pending tool call', {
+                id,
+                name: toolCall.function?.name,
+                argumentsLength: toolCall.function?.arguments ? toolCall.function.arguments.length : 0,
+              });
+            } else {
+              if (toolCall.function?.name) {
+                pendingToolCalls[id].name = toolCall.function.name;
+              }
+              if (toolCall.function?.arguments) {
+                pendingToolCalls[id].arguments += toolCall.function.arguments;
+                this.logger.debug('LLMClient', 'Updated pending tool call arguments', {
+                  id,
+                  name: pendingToolCalls[id].name,
+                  argumentsLength: pendingToolCalls[id].arguments.length,
+                  argumentsPart: toolCall.function.arguments,
+                });
+              }
             }
 
             // Check if the tool call is complete
             const pendingCall = pendingToolCalls[id];
+            const isValidJson = this.isValidJson(pendingCall.arguments);
+            this.logger.debug('LLMClient', 'Checking if tool call is complete', {
+              id,
+              name: pendingCall.name,
+              hasName: !!pendingCall.name,
+              hasArguments: !!pendingCall.arguments,
+              argumentsLength: pendingCall.arguments.length,
+              isValidJson,
+              arguments: pendingCall.arguments,
+            });
+
             if (
               pendingCall.name &&
               pendingCall.arguments &&
-              this.isValidJson(pendingCall.arguments)
+              isValidJson
             ) {
               try {
                 const parsedArgs = JSON.parse(pendingCall.arguments);
@@ -205,11 +232,62 @@ export class LLMClient {
                   'Tool call arguments not yet complete',
                   {
                     args: pendingCall.arguments,
+                    error: (error as Error).message,
                   },
                 );
               }
             }
           }
+        }
+
+        // After processing all chunks, check any remaining pending tool calls
+        if (chunk.choices[0]?.finish_reason === 'tool_calls') {
+          this.logger.debug('LLMClient', 'Finish reason is tool_calls, checking any pending tool calls', {
+            pendingToolCalls: JSON.stringify(pendingToolCalls),
+          });
+
+          // Try to complete any pending tool calls
+          for (const [id, pendingCall] of Object.entries(pendingToolCalls)) {
+            try {
+              if (pendingCall.name && pendingCall.arguments) {
+                // Try to fix JSON if needed
+                let args = pendingCall.arguments;
+                if (!this.isValidJson(args)) {
+                  // Simple attempt to fix common JSON issues
+                  this.logger.debug('LLMClient', 'Attempting to fix invalid JSON', {
+                    before: args,
+                  });
+                  args = args.replace(/\n/g, ' ').trim();
+                  if (!args.startsWith('{')) args = '{' + args;
+                  if (!args.endsWith('}')) args = args + '}';
+                  this.logger.debug('LLMClient', 'Fixed JSON', {
+                    after: args,
+                  });
+                }
+
+                const parsedArgs = JSON.parse(args);
+                completedToolCalls.push({
+                  id,
+                  name: pendingCall.name,
+                  params: parsedArgs,
+                });
+
+                this.logger.debug('LLMClient', `Completed pending tool call after finish: ${pendingCall.name}`, {
+                  id,
+                  params: parsedArgs,
+                });
+              }
+            } catch (error) {
+              this.logger.warn('LLMClient', `Could not complete pending tool call: ${pendingCall.name}`, {
+                id,
+                error: (error as Error).message,
+                arguments: pendingCall.arguments,
+              });
+            }
+          }
+
+          // Clear all pending tool calls
+          Object.keys(pendingToolCalls).forEach(id => delete pendingToolCalls[id]);
         }
 
         // Check for completion

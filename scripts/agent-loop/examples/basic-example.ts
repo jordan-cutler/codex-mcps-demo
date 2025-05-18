@@ -9,11 +9,14 @@ const calculatorTool: Tool = {
   name: 'calculator',
   description: 'Performs mathematical calculations',
   parameters: {
-    expression: {
-      type: 'string',
-      description: 'The mathematical expression to calculate',
-      required: true,
+    type: 'object',
+    properties: {
+      expression: {
+        type: 'string',
+        description: 'The mathematical expression to calculate',
+      },
     },
+    required: ['expression'],
   },
   execute: async (params: any) => {
     try {
@@ -33,11 +36,14 @@ const weatherTool: Tool = {
   name: 'getWeather',
   description: 'Gets the current weather for a location',
   parameters: {
-    location: {
-      type: 'string',
-      description: 'The city and state or country',
-      required: true,
+    type: 'object',
+    properties: {
+      location: {
+        type: 'string',
+        description: 'The city and state or country',
+      },
     },
+    required: ['location'],
   },
   execute: async (params: any) => {
     // This is a mock implementation
@@ -62,11 +68,14 @@ const dateTool: Tool = {
   name: 'getCurrentDate',
   description: 'Gets the current date and time',
   parameters: {
-    timezone: {
-      type: 'string',
-      description: 'Optional timezone (defaults to UTC)',
-      required: false,
+    type: 'object',
+    properties: {
+      timezone: {
+        type: 'string',
+        description: 'Optional timezone (defaults to UTC)',
+      },
     },
+    required: [],
   },
   execute: async (params: any) => {
     const date = new Date();
@@ -95,11 +104,11 @@ async function runExample() {
       llmProvider: {
         apiKey,
         model: 'gpt-4',
-        temperature: 0.7,
+        temperature: 1.0,
       },
       logging: {
         enabled: true,
-        level: 'info',
+        level: 'debug',
       },
       memory: {
         // Uncomment and add your mem0ai API key to use mem0ai for memory

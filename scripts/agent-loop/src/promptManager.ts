@@ -71,27 +71,22 @@ export class PromptManager {
         content += `Description: ${tool.description}\n`;
         content += `Parameters:\n`;
 
-        for (const [paramName, paramDetails] of Object.entries(
-          tool.parameters,
-        )) {
-          content += `  - ${paramName}: ${paramDetails.description || 'No description'} (${paramDetails.type || 'any'}${paramDetails.required ? ', required' : ''})\n`;
+        if (tool.parameters && tool.parameters.properties) {
+          for (const [paramName, paramDetails] of Object.entries(
+            tool.parameters.properties,
+          )) {
+            const isRequired =
+              tool.parameters.required &&
+              tool.parameters.required.includes(paramName);
+            content += `  - ${paramName}: ${paramDetails.description || 'No description'} (${paramDetails.type || 'any'}${isRequired ? ', required' : ''})\n`;
+          }
         }
 
         content += `\n`;
       }
 
-      content += `When you need to use a tool, format your response like this:
-<tool_call>
-{
-  "name": "toolName",
-  "params": {
-    "param1": "value1",
-    "param2": "value2"
-  }
-}
-</tool_call>
+      content += `When you need to use a tool, you should use the function calling capabilities provided by the API. Don't try to format function calls in your text - the system will handle this automatically.
 
-You can call multiple tools by using multiple tool_call blocks.
 After using tools, summarize what you did and provide a final answer.`;
     }
 
