@@ -1,54 +1,80 @@
-# Documentation Generation Tool
+# LangGraph Documentation Generator
 
-A powerful TypeScript CLI tool that uses LangGraph.js to generate comprehensive documentation from codebases.
+A powerful TypeScript CLI tool that uses LangGraph.js to generate comprehensive documentation from codebases. This tool leverages AI to analyze code and generate detailed documentation with cross-references and intelligent structure.
 
 ## Features
 
-- Language-agnostic code analysis
-- Automatic documentation generation with LangGraph
+- AI-powered code analysis using LangGraph
+- Automatic documentation generation for files and directories
 - Markdown formatting with cross-references
-- Template-based output customization
-- Configuration file support
+- Support for multiple programming languages
+- Memory management for cross-file references
 - CLI interface with various options
+- MCP (Model Context Protocol) integration for file operations
 
 ## Installation
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Build the project
-pnpm build
+npm run build
+
+# Link the CLI tool globally (optional)
+npm link
 ```
 
 ## Usage
 
-### Basic Usage
+### CLI Usage
 
 ```bash
 # Generate documentation for a file
-pnpm document path/to/file.ts
+npm run cli generate path/to/file.ts
 
 # Generate documentation for a directory
-pnpm document path/to/directory
+npm run cli generate path/to/directory
 
 # Generate documentation with custom output directory
-pnpm document path/to/directory -o path/to/output
+npm run cli generate path/to/directory -o path/to/output
 ```
 
 ### Advanced Options
 
 ```bash
-# Use a specific template
-pnpm document path/to/directory -t custom-template
+# Specify file extensions to include
+npm run cli generate path/to/directory -e ".ts,.js,.tsx"
 
-# Include only specific file patterns
-pnpm document path/to/directory -i "*.ts" "*.js"
+# Exclude specific directories
+npm run cli generate path/to/directory -x "node_modules,dist,build"
 
-# Exclude specific patterns
-pnpm document path/to/directory -e "node_modules" "dist"
+# Limit the maximum number of files to process
+npm run cli generate path/to/directory -m 100
+```
 
-# Use a configuration file
+### Programmatic Usage
+
+```typescript
+import { DocumentationGenerator } from '@/core/documentationGenerator';
+
+async function generateDocs() {
+  const generator = DocumentationGenerator.getInstance();
+  await generator.initialize();
+  
+  // Generate documentation for a single file
+  const sections = await generator.generateDocumentation('path/to/file.ts');
+  console.log(sections);
+  
+  // Generate documentation for a directory
+  const results = await generator.generateProjectDocumentation('path/to/directory', {
+    extensions: ['.ts', '.js'],
+    excludeDirs: ['node_modules', 'dist'],
+    maxFiles: 50
+  });
+  console.log(results);
+}
+```
 pnpm document path/to/directory -c config.json
 
 # Force overwrite of existing files

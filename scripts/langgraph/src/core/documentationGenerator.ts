@@ -1,77 +1,29 @@
 import { CodeAnalyzer, CodeAnalysisResult } from '@/core/codeAnalyzer';
 import { DocumentationSection } from '@/models/types';
+import { createDocumentationAgent } from '@/core/documentationAgent';
+import type { Runnable } from '@langchain/core/runnables';
+import path from 'path';
 
-// Define a simple state graph interface for our implementation
-interface IStateGraph<T> {
-  addNode(name: string, handler: (state: T) => Promise<T>): void;
-  addEdge(from: string, to: string): void;
-  setEntryPoint(name: string): void;
-  invoke(initialState: T): Promise<T>;
+/**
+ * Interface for the agent result
+ */
+interface AgentResult {
+  output: string;
+  sections?: DocumentationSection[];
 }
 
-// Simple implementation of a state graph for documentation generation
-class SimpleStateGraph<T> implements IStateGraph<T> {
-  private config: Record<string, unknown>;
-  private nodes: Map<string, (state: T) => Promise<T>> = new Map();
-  private edges: Map<string, string[]> = new Map();
-  private entryPoint: string = '';
-
-  constructor(config: Record<string, unknown>) {
-    this.config = config;
-  }
-
-  public addNode(name: string, handler: (state: T) => Promise<T>): void {
-    this.nodes.set(name, handler);
-  }
-
-  public addEdge(from: string, to: string): void {
-    if (!this.edges.has(from)) {
-      this.edges.set(from, []);
-    }
-    this.edges.get(from)?.push(to);
-  }
-
-  public setEntryPoint(name: string): void {
-    this.entryPoint = name;
-  }
-
-  public async invoke(initialState: T): Promise<T> {
-    let currentState = initialState;
-    let currentNode = this.entryPoint;
-
-    while (currentNode) {
-      const handler = this.nodes.get(currentNode);
-      if (!handler) {
-        break;
-      }
-
-      currentState = await handler(currentState);
-      
-      const nextNodes = this.edges.get(currentNode) || [];
-      currentNode = nextNodes.length > 0 ? nextNodes[0] : '';
-    }
-
-    return currentState;
-  }
-}
-
-// Define the state interface for our LangGraph
-interface DocumentationState {
-  codeAnalysis: CodeAnalysisResult;
-  documentation: DocumentationSection[];
-  currentSection: DocumentationSection | null;
-  status: 'idle' | 'processing' | 'complete' | 'error';
-  error?: string;
-}
-
+/**
+ * DocumentationGenerator class
+ * Responsible for generating documentation for code files using LangGraph
+ */
 export class DocumentationGenerator {
   private static instance: DocumentationGenerator;
   private codeAnalyzer: CodeAnalyzer;
-  private graph: SimpleStateGraph<DocumentationState>;
+  private agent!: Awaited<ReturnType<typeof createDocumentationAgent>>['agent'];
+  private initialized: boolean = false;
 
   private constructor() {
     this.codeAnalyzer = CodeAnalyzer.getInstance();
-    this.graph = this.createGraph();
   }
 
   public static getInstance(): DocumentationGenerator {
@@ -82,28 +34,50 @@ export class DocumentationGenerator {
   }
 
   /**
+   * Initialize the documentation agent
+   * This should be called before using the generator
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      const { agent } = await createDocumentationAgent();
+      this.agent = agent;
+      this.initialized = true;
+    } catch (error) {
+      console.error('Error initializing documentation agent:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Generate documentation for a file
    * @param filePath Path to the file
    * @returns Generated documentation sections
    */
   public async generateDocumentation(filePath: string): Promise<DocumentationSection[]> {
+    // Ensure the agent is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
     try {
       // Analyze the code file
       const codeAnalysis = await this.codeAnalyzer.analyzeFile(filePath);
-      
-      // Initialize state
-      const initialState: DocumentationState = {
-        codeAnalysis,
-        documentation: [],
-        currentSection: null,
-        status: 'idle'
-      };
-      
-      // Run the graph
-      const result = await this.graph.invoke(initialState);
-      
-      // Return the generated documentation
-      return result.documentation;
+
+      // Use the LangGraph agent to generate documentation
+      const result = await this.agent.invoke({
+        input: `Generate documentation for the file at ${filePath}`,
+        context: {
+          filePath,
+          codeAnalysis: JSON.stringify(codeAnalysis)
+        }
+      });
+
+      // Parse and return the documentation sections
+      return this.parseDocumentationResult(result, filePath, codeAnalysis);
     } catch (error) {
       console.error('Error generating documentation:', error);
       throw error;
@@ -111,93 +85,195 @@ export class DocumentationGenerator {
   }
 
   /**
-   * Create the LangGraph for documentation generation
-   * @returns StateGraph instance
+   * Generate documentation for multiple files
+   * @param filePaths Array of file paths
+   * @returns Generated documentation sections by file path
    */
-  private createGraph(): SimpleStateGraph<DocumentationState> {
-    // Define graph configuration
-    const graphConfig: Record<string, unknown> = {
-      channels: {
-        codeAnalysis: {},
-        documentation: {},
-        currentSection: {},
-        status: {},
-        error: {}
+  public async generateDocumentationForFiles(filePaths: string[]): Promise<Record<string, DocumentationSection[]>> {
+    // Ensure the agent is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    const results: Record<string, DocumentationSection[]> = {};
+
+    for (const filePath of filePaths) {
+      try {
+        const sections = await this.generateDocumentation(filePath);
+        results[filePath] = sections;
+      } catch (error) {
+        console.error(`Error generating documentation for ${filePath}:`, error);
+        results[filePath] = [];
       }
-    };
-    
-    // Create the graph
-    const graph = new SimpleStateGraph<DocumentationState>(graphConfig);
-    
-    // Add nodes to the graph
-    graph.addNode('initialize', this.initializeNode.bind(this));
-    graph.addNode('analyze_code_structure', this.analyzeCodeStructureNode.bind(this));
-    graph.addNode('generate_overview', this.generateOverviewNode.bind(this));
-    graph.addNode('generate_function_docs', this.generateFunctionDocsNode.bind(this));
-    graph.addNode('generate_class_docs', this.generateClassDocsNode.bind(this));
-    graph.addNode('generate_dependencies_docs', this.generateDependenciesDocsNode.bind(this));
-    graph.addNode('finalize', this.finalizeNode.bind(this));
-    
-    // Define the workflow
-    graph.addEdge('initialize', 'analyze_code_structure');
-    graph.addEdge('analyze_code_structure', 'generate_overview');
-    graph.addEdge('generate_overview', 'generate_function_docs');
-    graph.addEdge('generate_function_docs', 'generate_class_docs');
-    graph.addEdge('generate_class_docs', 'generate_dependencies_docs');
-    graph.addEdge('generate_dependencies_docs', 'finalize');
-    
-    // Set the entry point
-    graph.setEntryPoint('initialize');
-    
-    return graph;
+    }
+
+    return results;
   }
 
   /**
-   * Initialize the documentation generation process
-   * @param state Current state
-   * @returns Updated state
+   * Generate documentation for a project directory
+   * @param directoryPath Path to the project directory
+   * @param options Configuration options
+   * @returns Generated documentation by file path
    */
-  private async initializeNode(state: DocumentationState): Promise<DocumentationState> {
-    return {
-      ...state,
-      status: 'processing',
-      documentation: []
-    };
+  public async generateProjectDocumentation(
+    directoryPath: string,
+    options: {
+      extensions?: string[];
+      excludeDirs?: string[];
+      maxFiles?: number;
+    } = {}
+  ): Promise<Record<string, DocumentationSection[]>> {
+    const extensions = options.extensions || ['.ts', '.js', '.tsx', '.jsx'];
+    const excludeDirs = options.excludeDirs || ['node_modules', 'dist', 'build', '.git'];
+    const maxFiles = options.maxFiles || 50;
+
+    try {
+      // Find all files in the directory with the specified extensions
+      const files = await this.findFilesInDirectory(directoryPath, extensions, excludeDirs);
+
+      // Limit the number of files to process
+      const filesToProcess = files.slice(0, maxFiles);
+
+      if (filesToProcess.length === 0) {
+        console.warn('No files found to process in the directory');
+        return {};
+      }
+
+      console.log(`Processing ${filesToProcess.length} files out of ${files.length} found`);
+
+      // Generate documentation for all files
+      return this.generateDocumentationForFiles(filesToProcess);
+    } catch (error) {
+      console.error('Error generating project documentation:', error);
+      throw error;
+    }
   }
 
   /**
-   * Analyze code structure
-   * @param state Current state
-   * @returns Updated state
+   * Find files in a directory with specific extensions
+   * @param directoryPath Directory to search
+   * @param extensions File extensions to include
+   * @param excludeDirs Directories to exclude
+   * @returns Array of file paths
    */
-  private async analyzeCodeStructureNode(state: DocumentationState): Promise<DocumentationState> {
-    // This node would typically use an LLM to analyze the code structure
-    // For now, we'll use a simple implementation
-    return {
-      ...state,
-      currentSection: {
-        title: 'Code Structure Analysis',
-        content: `Analysis of ${state.codeAnalysis.path}`,
+  private async findFilesInDirectory(
+    directoryPath: string,
+    extensions: string[],
+    excludeDirs: string[]
+  ): Promise<string[]> {
+    try {
+      // Use the fs module to recursively find files
+      const { promises: fs } = await import('fs');
+      const { join } = await import('path');
+
+      const results: string[] = [];
+
+      async function walkDir(dir: string) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+
+          if (entry.isDirectory()) {
+            // Skip excluded directories
+            if (!excludeDirs.includes(entry.name)) {
+              await walkDir(fullPath);
+            }
+          } else if (entry.isFile()) {
+            // Check if file has one of the specified extensions
+            if (extensions.some(ext => entry.name.endsWith(ext))) {
+              results.push(fullPath);
+            }
+          }
+        }
+      }
+
+      await walkDir(directoryPath);
+      return results;
+    } catch (error) {
+      console.error('Error finding files in directory:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse the result from the documentation agent
+   * @param result Result from the agent
+   * @param filePath File path for context
+   * @param codeAnalysis Code analysis result for fallback
+   * @returns Array of documentation sections
+   */
+  private parseDocumentationResult(
+    result: unknown,
+    filePath: string,
+    codeAnalysis?: CodeAnalysisResult
+  ): DocumentationSection[] {
+    try {
+      // If the result already contains sections, use them
+      const agentResult = result as AgentResult;
+      if (agentResult.sections && Array.isArray(agentResult.sections)) {
+        return agentResult.sections;
+      }
+
+      // If we have output, create a section from it
+      if (typeof agentResult.output === 'string') {
+        const fileName = path.basename(filePath);
+        const section: DocumentationSection = {
+          title: `Documentation for ${fileName}`,
+          content: agentResult.output,
+          codeBlocks: [],
+          relatedSections: [],
+          lastUpdated: new Date().toISOString()
+        };
+
+        return [section];
+      }
+
+      // If we have code analysis but no output, create basic sections
+      if (codeAnalysis) {
+        return this.createBasicDocumentationSections(filePath, codeAnalysis);
+      }
+
+      // Fallback to a simple section
+      return [{
+        title: `Documentation for ${path.basename(filePath)}`,
+        content: 'Documentation could not be generated with the available information.',
         codeBlocks: [],
         relatedSections: [],
         lastUpdated: new Date().toISOString()
-      }
-    };
+      }];
+    } catch (error) {
+      console.error('Error parsing documentation result:', error);
+      // Return a fallback section
+      return [{
+        title: `Documentation for ${path.basename(filePath)}`,
+        content: 'Error generating documentation. Please try again.',
+        codeBlocks: [],
+        relatedSections: [],
+        lastUpdated: new Date().toISOString()
+      }];
+    }
   }
 
   /**
-   * Generate overview documentation
-   * @param state Current state
-   * @returns Updated state
+   * Create basic documentation sections from code analysis
+   * @param filePath File path
+   * @param codeAnalysis Code analysis result
+   * @returns Array of documentation sections
    */
-  private async generateOverviewNode(state: DocumentationState): Promise<DocumentationState> {
-    const { codeAnalysis } = state;
-    
+  private createBasicDocumentationSections(
+    filePath: string,
+    codeAnalysis: CodeAnalysisResult
+  ): DocumentationSection[] {
+    const fileName = path.basename(filePath);
+    const sections: DocumentationSection[] = [];
+
     // Create overview section
     const overviewSection: DocumentationSection = {
       title: 'Overview',
       content: `
-# ${this.getFileName(codeAnalysis.path)}
+# ${fileName}
 
 ## Overview
 
@@ -212,139 +288,70 @@ ${codeAnalysis.patterns.objectOriented ? 'This file uses object-oriented program
       relatedSections: ['Functions', 'Classes', 'Dependencies'],
       lastUpdated: new Date().toISOString()
     };
-    
-    return {
-      ...state,
-      documentation: [...state.documentation, overviewSection],
-      currentSection: overviewSection
-    };
-  }
 
-  /**
-   * Generate function documentation
-   * @param state Current state
-   * @returns Updated state
-   */
-  private async generateFunctionDocsNode(state: DocumentationState): Promise<DocumentationState> {
-    const { codeAnalysis } = state;
-    
-    if (codeAnalysis.functions.length === 0) {
-      return state;
-    }
-    
-    // Create functions section
-    const functionsSection: DocumentationSection = {
-      title: 'Functions',
-      content: `
+    sections.push(overviewSection);
+
+    // Create functions section if there are functions
+    if (codeAnalysis.functions.length > 0) {
+      const functionsSection: DocumentationSection = {
+        title: 'Functions',
+        content: `
 # Functions
 
 This file contains the following functions:
 
 ${codeAnalysis.functions.map(func => `- \`${func}\``).join('\n')}
-      `,
-      codeBlocks: codeAnalysis.blocks.filter(block => 
-        codeAnalysis.functions.some(func => block.content.includes(func))
-      ),
-      relatedSections: ['Overview', 'Classes'],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return {
-      ...state,
-      documentation: [...state.documentation, functionsSection],
-      currentSection: functionsSection
-    };
-  }
+        `,
+        codeBlocks: codeAnalysis.blocks.filter(block =>
+          codeAnalysis.functions.some(func => block.content.includes(func))
+        ),
+        relatedSections: ['Overview', 'Classes'],
+        lastUpdated: new Date().toISOString()
+      };
 
-  /**
-   * Generate class documentation
-   * @param state Current state
-   * @returns Updated state
-   */
-  private async generateClassDocsNode(state: DocumentationState): Promise<DocumentationState> {
-    const { codeAnalysis } = state;
-    
-    if (codeAnalysis.classes.length === 0) {
-      return state;
+      sections.push(functionsSection);
     }
-    
-    // Create classes section
-    const classesSection: DocumentationSection = {
-      title: 'Classes',
-      content: `
+
+    // Create classes section if there are classes
+    if (codeAnalysis.classes.length > 0) {
+      const classesSection: DocumentationSection = {
+        title: 'Classes',
+        content: `
 # Classes
 
 This file contains the following classes:
 
 ${codeAnalysis.classes.map(cls => `- \`${cls}\``).join('\n')}
-      `,
-      codeBlocks: codeAnalysis.blocks.filter(block => 
-        codeAnalysis.classes.some(cls => block.content.includes(`class ${cls}`))
-      ),
-      relatedSections: ['Overview', 'Functions'],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return {
-      ...state,
-      documentation: [...state.documentation, classesSection],
-      currentSection: classesSection
-    };
-  }
+        `,
+        codeBlocks: codeAnalysis.blocks.filter(block =>
+          codeAnalysis.classes.some(cls => block.content.includes(`class ${cls}`))
+        ),
+        relatedSections: ['Overview', 'Functions'],
+        lastUpdated: new Date().toISOString()
+      };
 
-  /**
-   * Generate dependencies documentation
-   * @param state Current state
-   * @returns Updated state
-   */
-  private async generateDependenciesDocsNode(state: DocumentationState): Promise<DocumentationState> {
-    const { codeAnalysis } = state;
-    
-    if (codeAnalysis.dependencies.length === 0) {
-      return state;
+      sections.push(classesSection);
     }
-    
-    // Create dependencies section
-    const dependenciesSection: DocumentationSection = {
-      title: 'Dependencies',
-      content: `
+
+    // Create dependencies section if there are imports
+    if (codeAnalysis.imports.length > 0) {
+      const dependenciesSection: DocumentationSection = {
+        title: 'Dependencies',
+        content: `
 # Dependencies
 
 This file imports the following dependencies:
 
-${codeAnalysis.dependencies.map(dep => `- \`${dep}\``).join('\n')}
-      `,
-      codeBlocks: [],
-      relatedSections: ['Overview'],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return {
-      ...state,
-      documentation: [...state.documentation, dependenciesSection],
-      currentSection: dependenciesSection
-    };
-  }
+${codeAnalysis.imports.map(dep => `- \`${dep}\``).join('\n')}
+        `,
+        codeBlocks: [],
+        relatedSections: ['Overview'],
+        lastUpdated: new Date().toISOString()
+      };
 
-  /**
-   * Finalize documentation generation
-   * @param state Current state
-   * @returns Updated state
-   */
-  private async finalizeNode(state: DocumentationState): Promise<DocumentationState> {
-    return {
-      ...state,
-      status: 'complete',
-      currentSection: null
-    };
-  }
+      sections.push(dependenciesSection);
+    }
 
-  /**
-   * Get file name from path
-   * @param path File path
-   * @returns File name
-   */
-  private getFileName(path: string): string {
-    return path.split('/').pop() || path;
+    return sections;
   }
 }

@@ -4,21 +4,30 @@
   "description": "Documentation generation tool using LangGraph.js",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "langgraph-docs": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",
     "test:doc": "tsx -r tsconfig-paths/register src/test/documentationTest.ts",
     "dev": "tsx src/index.ts",
-    "document": "tsx src/index.ts"
+    "document": "tsx src/cli.ts generate",
+    "cli": "tsx -r tsconfig-paths/register src/cli.ts"
   },
   "dependencies": {
+    "@langchain/community": "^0.3.43",
     "@langchain/core": "^0.3.56",
     "@langchain/langgraph": "^0.2.72",
+    "@langchain/mcp-adapters": "^0.4.5",
+    "@langchain/openai": "^0.5.10",
+    "@modelcontextprotocol/server-filesystem": "^2025.3.28",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.2",
-    "marked": "^15.0.11"
+    "marked": "^15.0.11",
+    "ora": "^8.0.1"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
