@@ -25,6 +25,14 @@ export interface AgentLoopConfig {
     enabled: boolean;
     level: 'debug' | 'info' | 'warn' | 'error';
   };
+  memory?: {
+    apiKey?: string;
+    userId?: string;
+    maxTokens?: number;
+    summarizeThreshold?: number;
+    persistenceEnabled?: boolean;
+    strategy?: 'basic' | 'sliding' | 'summarize' | 'vector';
+  };
 }
 
 /**

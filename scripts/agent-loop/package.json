@@ -9,10 +9,12 @@
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "start": "ts-node examples/basic-example.ts",
-    "start:complex": "ts-node examples/complex-example.ts"
+    "start:complex": "ts-node examples/complex-example.ts",
+    "start:memory": "ts-node examples/memory-example.ts"
   },
   "dependencies": {
-    "axios": "^1.6.2"
+    "axios": "^1.6.2",
+    "mem0ai": "^2.1.25"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

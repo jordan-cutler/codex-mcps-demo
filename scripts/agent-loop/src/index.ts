@@ -20,3 +20,6 @@ export { Logger } from './logger';
 export { PromptManager } from './promptManager';
 export { ToolManager } from './toolManager';
 export { LLMClient } from './llmClient';
+
+// Export memory components
+export { MemoryManager, TokenCounter, SlidingWindowStrategy } from './memory';

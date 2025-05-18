@@ -10,6 +10,7 @@ import { Logger } from './logger';
 import { PromptManager } from './promptManager';
 import { ToolManager } from './toolManager';
 import { LLMClient } from './llmClient';
+import { MemoryManager } from './memory/memoryManager';
 
 /**
  * Main AgentLoop class - orchestrates prompt creation, LLM calls, and tool execution
@@ -20,7 +21,7 @@ export class AgentLoop {
   private promptManager: PromptManager;
   private toolManager: ToolManager;
   private llmClient: LLMClient;
-  private history: Message[] = [];
+  private memoryManager: MemoryManager;
   private isRunning: boolean = false;
 
   /**
@@ -50,9 +51,23 @@ export class AgentLoop {
       this.logger,
     );
 
+    // Initialize memory manager
+    this.memoryManager = new MemoryManager(
+      {
+        apiKey: config.memory?.apiKey || '',
+        userId: config.memory?.userId,
+        maxTokens: config.memory?.maxTokens || 4000,
+        summarizeThreshold: config.memory?.summarizeThreshold,
+        persistenceEnabled: config.memory?.persistenceEnabled,
+        memoryStrategy: config.memory?.strategy,
+      },
+      this.logger,
+    );
+
     this.logger.info('AgentLoop', 'Initialized', {
       model: config.llmProvider.model,
       toolCount: config.tools.length,
+      memoryEnabled: !!config.memory?.apiKey,
     });
   }
 
@@ -75,19 +90,13 @@ export class AgentLoop {
       // Handle additional messages if provided
       if (additionalMessages.length > 0) {
         for (const message of additionalMessages) {
-          this.history.push({
-            role: 'user',
-            content: message,
-          });
+          await this.memoryManager.addUserMessage(message);
         }
       }
 
-      // Start with initial prompt if history is empty
-      if (this.history.length === 0) {
-        this.history.push({
-          role: 'user',
-          content: this.config.initialPrompt,
-        });
+      // Start with initial prompt if no messages in memory
+      if (this.memoryManager.getCurrentTokenCount() === 0) {
+        await this.memoryManager.addUserMessage(this.config.initialPrompt);
       }
 
       let turnsWithoutToolCalls = 0;
@@ -95,10 +104,11 @@ export class AgentLoop {
 
       // Main loop
       while (true) {
-        // Prepare messages for LLM with current history
+        // Prepare messages for LLM from memory
+        const messagesFromMemory = this.memoryManager.getMessagesForPrompt();
         const promptMessages = this.promptManager.createPrompt(
           this.config.initialPrompt,
-          this.history,
+          messagesFromMemory,
           this.toolManager.getTools(),
         );
 
@@ -135,12 +145,8 @@ export class AgentLoop {
           },
         );
 
-        // Save assistant response to history
-        const assistantMessage = this.promptManager.formatToolCallsForHistory(
-          fullContent,
-          allToolCalls,
-        );
-        this.history.push(assistantMessage);
+        // Save assistant response to memory
+        await this.memoryManager.addAssistantMessage(fullContent, allToolCalls);
 
         // Check if we need to execute tools
         if (allToolCalls.length > 0) {
@@ -157,10 +163,8 @@ export class AgentLoop {
             true, // parallel execution
           );
 
-          // Add tool results to history
-          const resultsMessage =
-            this.promptManager.formatToolResultsForHistory(toolResults);
-          this.history.push(resultsMessage);
+          // Add tool results to memory
+          await this.memoryManager.addToolResults(toolResults);
         } else {
           turnsWithoutToolCalls++;
 
@@ -185,9 +189,12 @@ export class AgentLoop {
 
       this.logger.info('AgentLoop', 'Agent loop completed successfully');
 
+      // Get full history from memory
+      const history = this.memoryManager.getMessagesForPrompt();
+
       return {
         finalAnswer,
-        history: [...this.history],
+        history,
         logs: this.logger.getLogs(),
       };
     } catch (error) {
@@ -235,7 +242,7 @@ export class AgentLoop {
    * Reset the agent loop state
    */
   reset(): void {
-    this.history = [];
+    this.memoryManager.clearMemory();
     this.logger.clearLogs();
     this.logger.info('AgentLoop', 'State reset');
   }

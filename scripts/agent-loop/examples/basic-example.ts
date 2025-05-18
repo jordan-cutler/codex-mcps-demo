@@ -101,6 +101,13 @@ async function runExample() {
         enabled: true,
         level: 'info',
       },
+      memory: {
+        // Uncomment and add your mem0ai API key to use mem0ai for memory
+        // apiKey: process.env.MEM0_API_KEY,
+        userId: 'example_user',
+        maxTokens: 4000,
+        strategy: 'sliding',
+      },
     });
 
     console.log('Running agent loop...');

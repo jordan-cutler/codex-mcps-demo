@@ -13,6 +13,7 @@ A reusable agent loop that manages context, tool use, and LLM calls. The agent l
 - **Logging and Tracing**: Provides detailed logs of internal decisions and actions for debugging.
 - **Parallel Tool Execution**: Supports concurrent execution of independent tool calls.
 - **Simple API**: Exposes a simple, single-entry-point API.
+- **Advanced Memory Management**: Uses mem0ai for context management with fallback to local memory.
 
 ## Installation
 
@@ -103,6 +104,14 @@ interface AgentLoopConfig {
     enabled: boolean;
     level: 'debug' | 'info' | 'warn' | 'error';
   };
+  memory?: {
+    apiKey?: string; // mem0ai API key (optional)
+    userId?: string; // User ID for memory storage
+    maxTokens?: number; // Maximum tokens to keep in context
+    summarizeThreshold?: number; // When to summarize older messages
+    persistenceEnabled?: boolean; // Enable persistence (not yet implemented)
+    strategy?: 'basic' | 'sliding' | 'summarize' | 'vector'; // Memory strategy
+  };
 }
 ```
 
@@ -171,6 +180,7 @@ Check out the `examples` directory for more examples:
 
 - `basic-example.ts`: A comprehensive example using calculator, weather, and date tools
 - `complex-example.ts`: A multi-step mathematical puzzle that demonstrates 5-15 iterations of the agent loop
+- `memory-example.ts`: An example demonstrating memory management across multiple turns
 - (Additional examples will be added in future versions)
 
 ### Running the Complex Example
@@ -189,6 +199,28 @@ npm run start:complex
 ```
 
 The example uses specialized tools for mathematical operations like factorial and Fibonacci calculations, along with a notepad tool to store intermediate results.
+
+### Running the Memory Example
+
+The memory example demonstrates context management across multiple conversation turns:
+
+1. It tests basic memory persistence (remembering name and facts)
+2. It shows how the sliding window strategy manages context when conversation gets long
+3. It integrates with mem0ai when an API key is provided
+4. It demonstrates graceful fallback to local memory when needed
+
+To run the memory example:
+
+```bash
+npm run start:memory
+```
+
+For full mem0ai integration, add your mem0ai API key to the .env file:
+
+```
+OPENAI_API_KEY=your_openai_api_key_here
+MEM0_API_KEY=your_mem0_api_key_here
+```
 
 ## Development
 
@@ -230,3 +262,37 @@ npm test
 ## License
 
 MIT
+
+## Memory Management
+
+Agent Loop includes advanced memory management capabilities to handle long conversations and maintain context effectively.
+
+### Features
+
+- **Sliding Window Strategy**: Automatically manages context window to stay within token limits
+- **Token Counting**: Estimates token usage to avoid exceeding LLM limits
+- **mem0ai Integration**: Optional integration with mem0ai for semantic memory and retrieval
+- **Local Memory Fallback**: Always maintains a local copy of memory for reliability
+
+### Configuring Memory
+
+You can configure memory management in the AgentLoopConfig:
+
+```typescript
+const loop = new AgentLoop({
+  // ... other config options ...
+  memory: {
+    apiKey: process.env.MEM0_API_KEY, // Optional mem0ai API key
+    userId: 'unique_user_id', // User ID for memory storage
+    maxTokens: 4000, // Maximum tokens to keep in context
+    strategy: 'sliding', // Memory strategy ('basic', 'sliding', etc.)
+  },
+});
+```
+
+### Memory Strategy
+
+- **basic**: Simple in-memory storage with no token management
+- **sliding**: Keeps the most recent messages that fit within token limits
+- **summarize**: (Coming soon) Summarizes older messages to save tokens
+- **vector**: (Coming soon) Uses vector embeddings for semantic retrieval
