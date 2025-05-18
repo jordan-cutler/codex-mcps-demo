@@ -1,0 +1,16 @@
+{
+  "input": "./src",
+  "output": "./docs",
+  "template": {
+    "name": "default",
+    "path": "",
+    "variables": {
+      "title": "LangGraph Documentation",
+      "lastUpdated": "2025-05-18"
+    }
+  },
+  "fileConfig": {
+    "include": ["*.ts", "*.js"],
+    "exclude": ["node_modules", ".git", "dist", "build", "test"]
+  }
+}

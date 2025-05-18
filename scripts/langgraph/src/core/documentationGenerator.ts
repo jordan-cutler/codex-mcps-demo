@@ -1,7 +1,6 @@
 import { CodeAnalyzer, CodeAnalysisResult } from '@/core/codeAnalyzer';
 import { DocumentationSection } from '@/models/types';
 import { createDocumentationAgent } from '@/core/documentationAgent';
-import type { Runnable } from '@langchain/core/runnables';
 import path from 'path';
 
 /**
@@ -96,14 +95,54 @@ export class DocumentationGenerator {
     }
 
     const results: Record<string, DocumentationSection[]> = {};
-
-    for (const filePath of filePaths) {
-      try {
-        const sections = await this.generateDocumentation(filePath);
-        results[filePath] = sections;
-      } catch (error) {
-        console.error(`Error generating documentation for ${filePath}:`, error);
-        results[filePath] = [];
+    
+    // Process files in smaller batches to avoid rate limits
+    const BATCH_SIZE = 3;
+    const DELAY_BETWEEN_BATCHES_MS = 5000; // 5 seconds delay between batches
+    
+    // Split files into batches
+    const batches: string[][] = [];
+    for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
+      batches.push(filePaths.slice(i, i + BATCH_SIZE));
+    }
+    
+    console.log(`Processing ${filePaths.length} files in ${batches.length} batches of up to ${BATCH_SIZE} files each`);
+    
+    // Process each batch
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} files)`);
+      
+      // Process files in the current batch
+      for (const filePath of batch) {
+        try {
+          console.log(`  Processing file: ${filePath}`);
+          const sections = await this.generateDocumentation(filePath);
+          results[filePath] = sections;
+          console.log(`  ✓ Completed: ${filePath}`);
+        } catch (error: unknown) {
+          // Check if error is an object with a code property
+          if (error && typeof error === 'object' && 'code' in error && error.code === 'rate_limit_exceeded') {
+            console.error(`  ⚠️ Rate limit exceeded for ${filePath}. Creating basic documentation instead.`);
+            // Create basic documentation instead of using the LLM
+            try {
+              const codeAnalysis = await this.codeAnalyzer.analyzeFile(filePath);
+              results[filePath] = this.createBasicDocumentationSections(filePath, codeAnalysis);
+            } catch (fallbackError) {
+              console.error(`  ❌ Failed to create basic documentation for ${filePath}:`, fallbackError);
+              results[filePath] = [];
+            }
+          } else {
+            console.error(`  ❌ Error generating documentation for ${filePath}:`, error);
+            results[filePath] = [];
+          }
+        }
+      }
+      
+      // Add delay between batches, except for the last batch
+      if (batchIndex < batches.length - 1) {
+        console.log(`Waiting ${DELAY_BETWEEN_BATCHES_MS/1000} seconds before processing next batch...`);
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
       }
     }
 
@@ -111,39 +150,62 @@ export class DocumentationGenerator {
   }
 
   /**
-   * Generate documentation for a project directory
+   * Generate documentation for a project directory using the agent-driven approach
    * @param directoryPath Path to the project directory
+   * @param outputPath Path where documentation should be saved
    * @param options Configuration options
    * @returns Generated documentation by file path
    */
   public async generateProjectDocumentation(
     directoryPath: string,
+    outputPath: string,
     options: {
       extensions?: string[];
       excludeDirs?: string[];
       maxFiles?: number;
     } = {}
   ): Promise<Record<string, DocumentationSection[]>> {
-    const extensions = options.extensions || ['.ts', '.js', '.tsx', '.jsx'];
-    const excludeDirs = options.excludeDirs || ['node_modules', 'dist', 'build', '.git'];
-    const maxFiles = options.maxFiles || 50;
+    // Ensure the agent is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
 
     try {
-      // Find all files in the directory with the specified extensions
-      const files = await this.findFilesInDirectory(directoryPath, extensions, excludeDirs);
-
-      // Limit the number of files to process
-      const filesToProcess = files.slice(0, maxFiles);
-
-      if (filesToProcess.length === 0) {
-        console.warn('No files found to process in the directory');
-        return {};
+      console.log('Starting agent-driven documentation generation...');
+      console.log(`Project directory: ${directoryPath}`);
+      console.log(`Output directory: ${outputPath}`);
+      
+      // Let the agent create and execute a documentation plan
+      const result = await this.agent.invoke({
+        input: `Generate comprehensive documentation for the project at ${directoryPath}. Save the documentation to ${outputPath}.`,
+        context: {
+          projectPath: directoryPath,
+          outputPath: outputPath,
+          options: JSON.stringify(options),
+        }
+      });
+      
+      console.log('Documentation generation completed.');
+      
+      // Parse the results
+      if (typeof result === 'object' && result !== null && 'sections' in result && Array.isArray(result.sections)) {
+        // If the agent returned structured sections, use them
+        const sections = result.sections as DocumentationSection[];
+        return { [directoryPath]: sections };
+      } else {
+        // Otherwise, create a simple result
+        const section: DocumentationSection = {
+          title: 'Project Documentation',
+          content: typeof result === 'object' && result !== null && 'output' in result ? 
+            String(result.output) : 
+            'Documentation generated successfully.',
+          codeBlocks: [],
+          relatedSections: [],
+          lastUpdated: new Date().toISOString()
+        };
+        
+        return { [directoryPath]: [section] };
       }
-
-      console.log(`Processing ${filesToProcess.length} files out of ${files.length} found`);
-
-      // Generate documentation for all files
-      return this.generateDocumentationForFiles(filesToProcess);
     } catch (error) {
       console.error('Error generating project documentation:', error);
       throw error;

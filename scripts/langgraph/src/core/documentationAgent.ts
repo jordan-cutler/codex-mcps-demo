@@ -2,6 +2,10 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 import {
   createMemoryManager,
   storeCodeAnalysis,
@@ -224,6 +228,58 @@ export const createDocumentationAgent = async () => {
     },
   );
 
+  // Create a planning tool
+  const createDocumentationPlanTool = tool(
+    async (input: { projectPath: string; outputPath: string }) => {
+      try {
+        const { projectPath, outputPath } = input;
+        
+        // Return information about the project to help the agent plan
+        return `Project path: ${projectPath}\nOutput path: ${outputPath}\n\nYou should now create a documentation plan by:\n1. Exploring the project structure\n2. Identifying key files and components\n3. Deciding on the documentation structure\n\nOnce you have a plan, you can execute it by analyzing files and generating documentation.`;
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          return `Error creating documentation plan: ${error.message}`;
+        }
+        return `Error creating documentation plan: Unknown error`;
+      }
+    },
+    {
+      name: 'create_documentation_plan',
+      description: 'Create a plan for generating documentation for a project',
+      schema: z.object({
+        projectPath: z.string().describe('Path to the project directory'),
+        outputPath: z.string().describe('Path where documentation should be saved'),
+      }),
+    },
+  );
+
+  // Create a tool to execute a specific part of the documentation plan
+  const executeDocumentationTaskTool = tool(
+    async (input: { task: string; filePath?: string; outputPath?: string }) => {
+      try {
+        const { task, filePath, outputPath } = input;
+        
+        // This is a placeholder that would normally execute a specific task
+        // In a real implementation, this would perform different actions based on the task type
+        return `Executed task: ${task}${filePath ? ` for file ${filePath}` : ''}${outputPath ? ` with output to ${outputPath}` : ''}`;
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          return `Error executing documentation task: ${error.message}`;
+        }
+        return `Error executing documentation task: Unknown error`;
+      }
+    },
+    {
+      name: 'execute_documentation_task',
+      description: 'Execute a specific task in the documentation plan',
+      schema: z.object({
+        task: z.string().describe('Description of the task to execute'),
+        filePath: z.string().optional().describe('Path to the file to process (if applicable)'),
+        outputPath: z.string().optional().describe('Path where output should be saved (if applicable)'),
+      }),
+    },
+  );
+
   // Combine all tools
   const tools = [
     ...mcpTools.tools, // Use all MCP tools directly
@@ -232,19 +288,24 @@ export const createDocumentationAgent = async () => {
     addCrossReferenceTool,
     getCrossReferencesTool,
     documentationGenerationTool,
+    createDocumentationPlanTool,
+    executeDocumentationTaskTool,
   ];
 
-  // Create LLM
+  // Create LLM with token limits to avoid rate limiting
   const llm = new ChatOpenAI({
     modelName: 'gpt-4o',
     temperature: 0,
+    apiKey: process.env.OPENAI_API_KEY,
+    maxTokens: 1000, // Limit output tokens
+    maxRetries: 3,   // Limit retries on failure
   });
 
   // Create agent
   const agent = createReactAgent({
     llm,
     tools,
-    prompt: `You are an expert documentation generator assistant. Your task is to analyze code files and generate comprehensive documentation.
+    prompt: `You are an expert documentation generator assistant. Your task is to analyze code projects and generate comprehensive documentation based on your own planning and decision making.
 
 You have access to the following tools:
 - You can read and write files
@@ -254,19 +315,35 @@ You have access to the following tools:
 - You can generate documentation sections
 - You can add and retrieve cross-references between documentation sections
 
-You can remember code analysis results from previous files
-You can maintain context across multiple files
-You can track cross-references between documentation sections
+You have full autonomy to create a documentation plan and execute it. Follow this high-level process:
 
-Follow this process:
-1. Analyze the code file to understand its structure
-2. Identify key components (functions, classes, etc.)
-3. Generate documentation for each component
-4. Add cross-references between related components
-5. Combine all documentation into a cohesive document
-6. Save the documentation to the specified output file
+1. PROJECT EXPLORATION PHASE:
+   - Analyze the project structure to understand the overall architecture
+   - Identify key directories, files, and components
+   - Determine the project's purpose, main features, and technology stack
 
-Always be thorough and accurate in your documentation.`,
+2. PLANNING PHASE:
+   - Decide which files are most important to document
+   - Plan the documentation structure (e.g., overview, API docs, tutorials)
+   - Determine what documentation files need to be created
+
+3. EXECUTION PHASE:
+   - Read and analyze the selected files in depth
+   - Generate documentation for each important component
+   - Create cross-references between related components
+   - Organize documentation into logical sections
+   - Create index files and navigation structure
+
+You should prioritize understanding the big picture first, then dive into details. Focus on documenting:
+- Project overview and purpose
+- Architecture and design patterns
+- Key components and their interactions
+- APIs and interfaces
+- Usage examples
+
+Use your judgment to determine what's most important to document based on the project's nature and complexity.
+
+Always be thorough and accurate in your documentation, focusing on clarity and usefulness for developers who need to understand and work with the code.`,
   });
 
   // Create runnable with memory
